@@ -1,0 +1,230 @@
+---
+title: "Can we predict the price of an Airbnb? Modeling with real airbnb booking data"
+
+subtitle: |
+  | Regression Prediction Problem
+  | Data Science 3 with R (STAT 301-3)
+
+author: Chelsea Nelson
+
+pagetitle: "Regression Prediction Problem"
+
+date: today
+
+format:
+  html:
+    toc: true
+    toc-location: left
+    embed-resources: true
+    
+execute:
+  echo: false
+  warning: false
+
+from: markdown+emoji 
+reference-location: margin
+citation-location: margin
+---
+::: {.callout-tip icon="false" appearance="simple"}
+## Github Repo Link
+
+[Regression Prediction Problem Github Repo](https://github.com/stat301-3-2024-spring/regression-pred-prob-chelseanelson)
+:::
+
+```{r}
+#| label: load-packages
+#| echo: false 
+
+library(tidyverse)
+library(tidymodels)
+library(here)
+```
+
+
+## Introduction 
+
+Welcome to my Airbnb Price Regression Project!
+
+Within this project, I applied and extend my skills in predictive modeling to identify the price of Airbnb listings in Chicago. Knowing the price of an Airbnb based on different factors is extremely important in terms of budgeting and figuring out what one should be looking for in an Airbnb, thus correctly identifying them can enhance user experience and trust on the platform. 
+
+For this regression challenge, I first conducted a thorough EDA to start to understand the data's structure and the relationships between various features and price. Afterwards, I conducted multiple different rounds of model building all based off of the previously ones before it. Thus in round 1, I chose to start with multiple models to evaluate their initial performances. This approach allowed me to identify which models performed the best before narrowing down my options in subsequent rounds. This iterative process ensures that I selected the most effective models for further refinement and optimization. 
+
+#### Added Variables
+
+Through understanding the data's structure the relationship between the various variables with my EDA. I decided to try an enhance the predictive power of my models, through the introduction of two additional variables, as I felt they had potential relevance to the price of an Airbnb.
+
+- `in_illinois`: A binary variable indicating whether the listing is located in Illinois. I added this variable as I saw that a lot of the host locations where in Illinois with only a fair amount not being in Illinois thus I felt it would be intuitive to add on this variable that looked at if someone was a host in Illinois or not, seeing if it has any influence in the price of their Airbnbs.
+
+- `number_of_verifications`: A variable representing the number of verifications the host has. I added this variable as I saw that the original verifications variable did not really provide a lot of value as, I personally feel that the total number of verifications matters more than the type of verifications that a host has in determining the price and value of their Airbnbs, being more secure or not about it. 
+
+#### Data Splitting and Validation
+
+To ensure robust model training and evaluation, I employed an 80/20 or 75/25 train-test split strategy, depending on if I felt I wanted more data within my training set or not. Additionally, I utilized cross-validation to further validate my models and mitigate the risk of overfitting. This approach ensures that the model's performance is generalizable to unseen data.
+
+#### Evaluation Metric
+
+The primary evaluation metric for this project is the Mean Absolute Error (`MAE`). `MAE` measures the average magnitude of errors between the predicted and actual values, providing a straightforward interpretation of prediction accuracy. My goal is to achieve a low `MAE`, indicating high model accuracy and minimal prediction errors.
+
+
+## Model Selection
+
+Despite neither model/submission making the top threshold for the challenge, I believe that due to their robustness and dependability they will perform well on the private/unseen data. 
+
+### Round 3 Recipe 1 Boosted Tree Model
+
+This model is associated with the submission that performed the best on the public leaderboard for me, being 
+`airbnb_submission_3_3.csv`. This model was created during the third round of model building and testing, being the third submission from this round. 
+
+#### How I got to this model {#sec-howigottothismodel}
+
+I got this model after looking at what worked and did not work from the previous two rounds, in terms of the tuning parameters that I set, as well as. the models to use, and how I should format my recipes to bring the most optimization to my models.
+
+Through the first round results, where I additionally completed a log10 transformation on the `price` variable to make it more symmetric, I saw that a more baseline or less feature engineered recipe, from at least my perspective of how I was working on them, performed a lot better than the heavily feature engineered recipe. This might have been related to how I was ordering my steps within the recipes however. Overall, this also perhaps served as a lesson that too much feature engineering can also lower performance rather than improve it always. 
+
+In round two, I did not complete a log10 transformation on the `price` variable rather just getting rid of the largest outlier. I saw again the same trend of my less feature engineered recipe doing better than the heavily feature engineered recipe. However, in comparing results from round 1 to round 2, I saw that not doing the log10 transformation on price produced worse performances for my models than when I did do the log10 transformation. 
+
+Thus, I went into round 3, noting that it might be good to combine the different aspects of round 1 and round 2, that I felt were beneficial. Therefore, I did complete a log10 transformation on the `price` variable as well as getting rid of the largest outlier still as it seem like a astronomical value on its own. Additionally, I decided to work with a similar "baseline" recipe to that which I used in round 1, focusing in more to changing the tuning parameters, finding the best ranges for my models to be optimized in their performances. 
+
+Furthermore, I chose to continue working with Boosted Tree models through this process, as they performed the best out of all of the model types for each round and stage. 
+
+#### Recipe {#sec-recipe}
+
+Turning to the recipe, it is very similar to the one I used in round 1, however differing as I decided to add on `step_corr()` to identify and remove highly correlated predictors, as well as changing the threshold for `step_other()` to be 0.1 as I felt that at the previous threshold of 0.5, I was lossing too much of the data. As Boosted tree models are nonparametric, I did create a seperate recipe for them from the parametric models. The only differ being that `step_dummy()` for the nonparametric models has one hot encoding enabled, and the parametric models do not. 
+
+Steps: 
+
+- `update_role()` : This function updates the roles of variables in your dataset. In This I used it to update the role of the id variable from being a predictor to being just an id indicator that would not be apart of the model building but still exist in my dataset. This ensures that the model treats each variable appropriately, avoiding misuse of variables that could lead to poor model performance.
+
+- `step_date()` : This step extracts components of date variables (e.g., year, month, day, day of the week), making them into separate entities within my dataset. By breaking down date variables into meaningful components, the model can better capture temporal patterns and trends, which can enhance predictive accuracy.
+
+- `step_impute_mode()` : This step imputes missing values in categorical variables using the mode or most frequent value. Handling missing data appropriately prevents loss of information and allows the model to make better use of available data, improving robustness and accuracy.
+
+- `step_impute_median()` : This step imputes missing values in numeric variables using the median or 50% percentile number. Imputing with the median is less sensitive to outliers compared to the mean, resulting in more stable and reliable imputations that improve model performance.
+
+- `step_novel()` : This step assigns a new category (“novel”) to previously unseen factor levels in categorical variables during prediction. By handling novel levels, the model can generalize better to new data and avoid errors or misclassifications caused by unexpected categories.
+
+- `step_other()` : This step consolidates infrequent factor levels into a single “other” category. With this step I set the threshold to 0.1, meaning that if the factor level did not show up more than 10% of the time, it would be placed into the “other” category. This helps to reduce the number of categories in the categorical variables, preventing overfitting and improving model interpretability and performance by ensuring the model focuses on more significant patterns.
+
+- `step_corr()` : This step identifies and removes highly correlated predictors. By removing these predictors, I ensured that the final model includes only the most relevant and independent features, improving its predictive power and interpretability.
+
+- `step_dummy()` : This step converts categorical variables into dummy (one-hot encoded) variables. Dummy variables allow models to handle categorical data appropriately, enabling the model to capture the impact of each category on the outcome variable.
+
+- `step_nzv()` : This step removes near-zero variance predictors. By eliminating predictors that have little to no variation, the model avoids overfitting to noise and improves computational efficiency and model performance.
+
+- `step_normalize()` : This step normalizes numeric variables to have a mean of zero and a standard deviation of one. Normalizing data can improve the convergence and performance of many algorithms (e.g., gradient-based methods) by ensuring that each feature contributes equally to the model’s predictions.
+
+#### Tuning Parameters
+
+The tuning parameters that I set during this round are based on information gained during round 1 of model building, figuring out what values or ranges worked to provide the best performing models/models types. I felt for round 2 as I did not take the same structural path as during round 1 and round 3, in relation to the log10 transformation of `price`, the tuning parameters that were best for round 2 would not be reflective of what I should use in round 3.
+
+For my Boosted Tree model, I decided to tune the following parameters:
+
+- `trees()` : I tuned this hyperparameter in the range (1000, 1500). I decided to do this after looking at the autoplot for my round 1 "baseline" Boosted Tree model types, I felt there was a trend with as the number of trees rose, the `MAE` metric would showcase better performance.
+
+- `mtry()` : I tuned this hyperparameter in the range (15,45). I decided to do this after also looking at the autoplot for my round 1 "baseline" Boosted Tree model types, and I saw that a higher range for this hyperparamter might provide me with better performance than that of a lower range. Thus I wanted to go for a middle ground of not being too high but also exploring more in that range.
+
+- `learn_rate()` : I used the default range when tuning this hyperparameter. Previously, in round one I used the range (-5, -0.2) based on previous labs in class. However I felt to better gauge what the optimal range and parameters are for this hyperparameter, I went back to looking at the default range which covered a large area.
+
+I decided to not tune `min_n()` has after looking at how the parameter performed at the different levels for my round 1 baseline Boosted Tree model types, I confirmed that when `min_n()` equals 1, I will receive the optimized performance for the model overall, compared to other values of `min_n()`.
+
+#### Final Assessment 
+
+Turning to the final assessment of the model (round 3, recipe 1 Boosted Tree model), I was able to see that it performed relatively well on the testing portion of the `train_classification.csv` file, as showed in the table below, producing a `MAE` value of .114, in relation to being on a log10 scale. This is an extremely low `MAE` value indicating that the model performs well as it can very effectively predict the price of Airbnbs with minimal error. This low error rate suggests that the model's predictions are very close to the actual values, demonstrating high accuracy and reliability in its estimations. Such performance is particularly notable on a log10 scale, where even small differences can represent significant changes in magnitude, further underscoring the model's precision and robustness. An MAE value close to 0, as mine is, suggests that the model’s predictions are highly accurate, with minimal deviation from the actual values. Thus meaning the model does extremely well in predicting the price of Airbnbs. 
+
+```{r}
+#| label: assessment-1
+#| echo: false 
+
+read_rds(here("results/round_3/airbnb_model_metrics.rds")) %>% knitr::kable()
+```
+
+![Predicted Price (Log10 Scale) v. Actual Price (Log10 Scale) - Boosted Tree Model](results/round_3/airbnb_price_plot.png){#fig-1}
+
+@fig-1 also affirms the performance metric value that we received as it showcases to us the predicted prices versus the actual prices of the Airbnbs. Since, there is a strong linear relationship between the points, we can confirmed that the Boosted Tree model does a good job at pricing prices accurately. 
+
+Although not having a complete one to one comparison of the performance of the model on my testing set to that of the performance of the model on `test_classification.csv`, due to the Log10 transformation. After submitting it to Kaggle, I received a `MAE` score of 46.91. Thus on unseen data, the model was able to predict Airbnb price values with an average error of 46.91 dollars. This performance metric suggests the model's predictions are reasonably close to the actual values, demonstrating its effectiveness in generalizing to new, unseen data. However this did not reach the top threshold of the regression challenge, thus I hope it will do better on the private test data.
+
+Overall, this model was robust being able to interpret unseen data and produce predictions that were also completely accurate, having little to no average error in predictions. 
+
+### Round 3 Recipe 1 Random Forest Model 
+
+#### How I got to this model
+
+As my two models come from the same round, I approached how I got to this model (round 3, recipe 1 Random Forest model) in the same manner as the previous model (round 3, recipe 1 Boosted Tree model). If you would like a more indepth analysis of how I reach this stage, that can be found in @sec-howigottothismodel.
+
+Specifically, I decided to continue to work with Random Forest models up until this stage, because they consistently performed well being the second best model type after the Boosted Tree models in every round and stage I progressed through. 
+
+#### Recipe
+
+As the models come from the same round of model building, they also used the same recipe. Thus I will include a small section of the steps that I did use again. However if you would like a more indepth analysis of what each step does and how it helped me in my model building process, that can be found in @sec-recipe. 
+
+Steps: 
+
+- `update_role()`
+
+- `step_date()`
+
+- `step_impute_mode()`
+
+- `step_impute_median()`
+
+- `step_novel()` 
+
+- `step_other()` 
+
+- `step_corr()` 
+
+- `step_dummy()` 
+
+- `step_nzv()`
+
+- `step_normalize()` 
+
+#### Tuning Parameters
+
+As previously stated above, the tuning parameters that I set during this round are based on information gained during round 1 of model building, figuring out what values or ranges worked to provide the best performing models/models types. I felt that since during round 2 I did not take the same structural path as during round 1 and round 3, in relation to the log10 transformation of `price`, the tuning parameters that were best for round 2 would not be reflective of what I should use in round 3.
+
+For my Random Forest model, I decided to tune the following parameters:
+
+- `trees()` : I tuned this hyperparameter in the range (1000, 1500). I decided to do this after looking at the autoplot for my round 1 "baseline" Random Forest model types. I wanted to see if there would be any change in performance if I were to tune this parameter, as during round 1 I left it at 1000. Through this tuning, I was able to see that as the number of trees increased, the `MAE` score decreased. 
+
+- `mtry()` : I tuned this hyperparameter in the range (15,45). I decided to do this after also looking at the autoplot for my round 1 "baseline" Random Forest model types. I saw that a higher range for this hyperparamter might provide me with better performance than that of a lower range. Thus I wanted to go for a middle ground of not being too high but also exploring more in that range. Furthermore, within this I saw that past 40 there was little to no increase in performance for the `MAE` metric, thus meaning the mean value was not decreasing by much anymore.
+
+I decided to not tune `min_n()` has after looking at how the parameter performed at the different levels for my round 1 "baseline" Random Forest model types, I confirmed that when `min_n()` equals 1, I will receive the optimized performance for the model overall, compared to other values of `min_n()`.
+
+#### Final Assessment 
+
+Turning to the final assessment of the model (round 3, recipe 1 Random Forest model), I was able to see that it performed relatively well on the testing portion of the `train_classification.csv` file, as showed in the table below, producing a `MAE` value of .121, in relation to being on a log10 scale. This is a low `MAE` value indicating that the model performs well as it can very effectively predict the price of Airbnbs with minimal error. This low error rate suggests that the model's predictions are close to the actual values, demonstrating accuracy and reliability in its estimations. An MAE value close to 0, as mine is, suggests that the model’s predictions are close to accurate, with minimal deviation from the actual values. Thus meaning the model does well in predicting the price of Airbnbs. 
+
+```{r}
+#| label: assessment-2
+#| echo: false 
+
+read_rds(here("results/round_3/airbnb_model_metrics_2.rds")) %>% knitr::kable()
+```
+
+![Predicted Price (Log10 Scale) v. Actual Price (Log10 Scale) - Random Forest Model](results/round_3/airbnb_price_plot_2.png){#fig-2}
+
+@fig-2 also affirms the performance metric value that we received as it showcases to us the predicted prices versus the actual prices of the Airbnbs. Since, there is a strong growing linear relationship between the points, we can confirmed that the Random Forest model does a good job at pricing prices accurately. 
+
+Although not having a complete one to one comparison of the performance of the model on my testing set to that of the performance of the model on `test_classification.csv`, due to the Log10 transformation. After submitting it to Kaggle, I received a `MAE` score of 50.79. Thus on unseen data, the model was able to predict Airbnb price values with an average error of 50.79 dollars. This performance metric suggests the model's predictions are reasonably close to the actual values, demonstrating its effectiveness in generalizing to new, unseen data. However this did not reach the top threshold of the regression challenge, thus I hope it will do better on the private test data.
+
+Overall, this model was robust being able to interpret unseen data and produce predictions that were also completely accurate, having little to no average error in predictions. 
+
+## Why I choose these two models
+
+I chose my first model, round 3, recipe 1 Boosted Tree model, because it was my best performing model/submission demonstrating strong predictive capabilities passing the challenges second highest threshold. I believe that my model due to its robust and well-designed attributes will perform well on the private test data. 
+
+I chose my second model, the round 3, recipe 1, Random Forest model, because I feel that Random Forest models overall are extremely robust and well-designed to produce accurate predictions on unseen data. Additionally, random forest models are known for not leading to overfitting quickly, due to their nonparametric approach. Furthermore, throughout the process, my Random Forest models consistently achieved low mean `MAE` values, around 0.119, indicating good predictive ability. This high performance gives me confidence that the Random Forest model will perform well on the private test data.  
+
+Overall, I have confidence in my model selection choices because throughout the entire process, both my Random Forest and Boosted Tree models types performed the best out of all of the models that I used and tuned.
+
+## Conclusion
+
+This project has showcased the application of various predictive modeling techniques to accurately predict Airbnb prices. 
+
+I was able to produced two efficient and robust models using `MAE` as the primary evaluation metric, providing a clear and interpret able measure of prediction accuracy. Both the Boosted Tree and Random Forest models demonstrated high performances, with the Random Forest model producing a `MAE` value of 50.79 on unseen data and the Boosted Tree model having a `MAE` value of 46.91. These performances underscored the robustness and reliability of both models, with both being able to predict Airbnb prices, with little to error. 
+
+Additionally both models stand out for their robustness and ability to produce accurate predictions on unseen data. The nonparametric nature and resistance to overfitting for both models make them a dependable choice for practical applications. The low mean `MAE` values achieved throughout the process further gives me confidence in their abilities to perform well on private test data.
+
+Thus through leveraging insights from data exploration, adding relevant variables, and rigorously validating models, I was able to develop accurate and reliable models for predicting Airbnb prices.

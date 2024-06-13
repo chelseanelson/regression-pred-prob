@@ -1,0 +1,66 @@
+# Regression Prediction Problem - Round 1 
+# Define, fit and tune baseline SVM Polynomial model 
+# BE AWARE: there is a random process in this script (seed set right before it)
+
+# load packages ----
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(doMC)
+
+# handle common conflicts 
+tidymodels_prefer()
+
+# set up parallel processing
+num_cores <- parallel::detectCores(logical = TRUE)
+registerDoMC(cores = num_cores - 1)
+
+# load folded data 
+load(here("data/model_data/round_1/airbnb_folds.rda"))
+
+# load pre-processing/feature engineering recipe 
+load(here("recipes/round_1/baseline_rec.rda"))
+load(here("results/round_1/fitted_tuned_models/metric_sets.rda"))
+
+# model specifications ----
+svm_poly_model <-
+  svm_poly(
+    mode = "regression",
+    cost = tune(),
+    degree = tune(),
+    scale_factor = tune()
+  ) %>%
+  set_engine("kernlab")
+
+# define workflows ---
+svm_poly_wflow <-
+  workflow() %>%
+  add_model(svm_poly_model) %>%
+  add_recipe(baseline_rec)
+
+# hyperparameter tuning values ----
+
+# check ranges for hyperparameters 
+hardhat::extract_parameter_set_dials(svm_poly_model)
+
+# change hyperparameter ranges 
+svm_poly_params <- extract_parameter_set_dials(svm_poly_model)
+
+# build tuning grid 
+svm_poly_grid <- grid_regular(svm_poly_params, levels = 7)
+
+# tune workflows/models ----
+# set seed 
+set.seed(6541)
+
+tuned_svm_poly_1 <-
+  svm_poly_wflow %>%
+  tune_grid(
+    airbnb_folds,
+    grid = svm_poly_grid,
+    control = control_grid(save_workflow = TRUE),
+    metrics = metric_sets
+  )
+
+# write out results (fitted/trained workflows) ----
+save(tuned_svm_poly_1, file = here("results/round_1/fitted_tuned_models/tuned_svm_poly_1.rda")) 
